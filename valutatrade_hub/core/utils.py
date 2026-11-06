@@ -29,7 +29,7 @@ def load_data(filename: str, default_factory= list):
 
 
 def save_data(filename: str, data: list | dict) -> None:
-    """Безопасно сохраняет данные в JSON-файл (атомарная запись)."""
+    """Безопасно сохраняет данные в JSON-файл"""
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
 
