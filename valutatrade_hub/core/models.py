@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import secrets
 from typing import Optional
+from valutatrade_hub.core.exceptions import InsufficientFundsError
 
 
 class User:
@@ -117,10 +118,15 @@ class Wallet:
             "balance": float(self._balance)
         }
 
+
     def withdraw(self, amount: float):
         self.validate_amount(amount)
         if amount > self._balance:
-            raise ValueError("На балансе недостаточно средств для снятия!")
+            raise InsufficientFundsError(
+                available=self._balance,
+                required=amount,
+                code=self.currency_code
+            )
         self.balance -= amount
 
 class Portfolio:
@@ -167,7 +173,7 @@ class Portfolio:
         for code, wallet in self._wallets.items():
             rate = rates.get(code)
             if rate is None:
-                raise ValueError(f"Нет курса для валюты {code}")
+                continue
             total += (wallet.balance * rate) / base_rate
         return total
 
