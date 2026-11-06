@@ -1,18 +1,30 @@
-import datetime
 import secrets
 import hashlib
+import datetime
 
 from valutatrade_hub.core.models import User, Portfolio
-from valutatrade_hub.core.utils import load_data, save_data
+from valutatrade_hub.core.utils import load_data
+from valutatrade_hub.infra.database import DatabaseManager
+from valutatrade_hub.decorators import log_action
+from valutatrade_hub.core.сurrencies import get_currency
+from valutatrade_hub.core.exceptions import (
+    InsufficientFundsError,
+    CurrencyNotFoundError,
+    ApiRequestError
+)
+from valutatrade_hub.infra.settings import SettingsLoader
 
 
+@log_action("REGISTER")
 def register_user(username: str, password: str) -> str:
     """Функция для регистрации нового пользователя"""
+
+    db = DatabaseManager()
 
     if len(password) < 4:
         raise ValueError("Пароль должен быть не короче 4 символов")
 
-    users_data = load_data("users.json")
+    users_data = db.load("users.json")
     for user_dict in users_data:
         if user_dict["username"].lower() == username.lower():
             raise ValueError(f"Имя пользователя '{username}' уже занято")
@@ -42,7 +54,7 @@ def register_user(username: str, password: str) -> str:
     })
 
 
-    portfolios_data = load_data("portfolios.json")
+    portfolios_data = db.load("portfolios.json")
     new_portfolio = Portfolio(user_id=new_user.user_id)
 
     portfolios_data.append({
@@ -50,11 +62,13 @@ def register_user(username: str, password: str) -> str:
         "wallets": {}
     })
 
-    save_data("portfolios.json", portfolios_data)
-    save_data("users.json", users_data)
+    db.save("users.json", users_data)
+    db.save("portfolios.json", portfolios_data)
+
 
     return f"Пользователь '{username}' зарегистрирован (id={new_id}). Войдите: login --username {username} --password {password}"
 
+@log_action("LOGIN")
 def login(username: str, password: str) -> User:
     """Функция для входа существующего пользователя"""
     users_data = load_data("users.json")
@@ -90,22 +104,28 @@ def validate_currency(currency_code: str) -> str:
 
 
 def get_rate(currency_code: str) -> dict:
-    """
-    Возвращает словарь с курсом валюты к USD.
-    """
-    currency_code = validate_currency(currency_code)
-    rates_data = load_data("rates.json", default_factory=dict)
+    """Возвращает курс валюты к USD с учётом TTL."""
+    currency_code = currency_code.upper().strip()
+    get_currency(currency_code)
+
+    db = DatabaseManager()
+    rates_data = db.load("rates.json", default_factory=dict)
+
+    settings = SettingsLoader()
+    ttl = settings.get("RATES_TTL_SECONDS", 300)
 
     if currency_code == "USD":
-        return {
-            "rate": 1.0,
-            "updated_at": rates_data.get("last_refresh", "Unknown")
-        }
+        return {"rate": 1.0, "updated_at": "now"}
 
     pair = f"{currency_code}_USD"
-
     if pair not in rates_data:
-        raise ValueError(f"Курс для валюты {currency_code} не найден.")
+        raise CurrencyNotFoundError(currency_code)
+
+    updated_at_str = rates_data[pair].get("updated_at")
+    if updated_at_str:
+        updated_at = datetime.datetime.fromisoformat(updated_at_str)
+        if (datetime.datetime.now() - updated_at).total_seconds() > ttl:
+            raise ApiRequestError(f"Курс для {currency_code} устарел. Обновите данные.")
 
     return rates_data[pair]
 
@@ -178,13 +198,21 @@ def get_portfolio_info(user: User, base_currency: str = "USD") -> dict:
 
     wallets_info = []
     for code, wallet in portfolio.wallets.items():
-        rate = rates.get(code, 0)
-        base_rate = rates.get(base_currency, 1.0)
-        value_in_base = (wallet.balance * rate) / base_rate
+        rate = rates.get(code)
+
+        if rate is None:
+            value_in_base = 0.0
+            is_rate_missing = True
+        else:
+            base_rate: float = rates.get(base_currency, 1.0)
+            value_in_base = (wallet.balance * rate) / base_rate
+            is_rate_missing = False
+
         wallets_info.append({
             "code": code,
             "balance": wallet.balance,
-            "value": value_in_base
+            "value": value_in_base,
+            "is_rate_missing": is_rate_missing
         })
 
     return {
@@ -195,20 +223,17 @@ def get_portfolio_info(user: User, base_currency: str = "USD") -> dict:
     }
 
 
+@log_action("BUY", verbose=True)
 def buy_currency(user: User, currency_code: str, amount: float) -> dict:
-    """Покупает валюту: пополняет кошелек и возвращает данные для отчета."""
+    get_currency(currency_code)
 
-    currency_code = validate_currency(currency_code)
     if amount <= 0:
         raise ValueError("'amount' должен быть положительным числом")
 
-    portfolios_data = load_data("portfolios.json")
-    user_portfolio: dict | None  = None
-    for p in portfolios_data:
-        if p["user_id"] == user.user_id:
-            user_portfolio = p
-            break
+    db = DatabaseManager()
+    portfolios_data = db.load("portfolios.json")
 
+    user_portfolio: dict | None= next((p for p in portfolios_data if p["user_id"] == user.user_id), None)
     if not user_portfolio:
         raise ValueError("Портфель не найден.")
 
@@ -217,70 +242,60 @@ def buy_currency(user: User, currency_code: str, amount: float) -> dict:
 
     old_balance = user_portfolio["wallets"][currency_code]["balance"]
 
+    rate_data = get_cross_rate("USD", currency_code)
+    rate = rate_data["rate"]
+
     user_portfolio["wallets"][currency_code]["balance"] += amount
     new_balance = user_portfolio["wallets"][currency_code]["balance"]
 
-    save_data("portfolios.json", portfolios_data)
+    db.save("portfolios.json", portfolios_data)
 
-    try:
-        rate_info = get_rate(currency_code)
-        rate = rate_info["rate"]
-    except ValueError:
-        raise ValueError(f"Не удалось получить курс для {currency_code}=USD")
-
-    total_cost = amount * rate
+    total_cost = amount / rate
 
     return {
-        "currency": currency_code,
+        "currency": currency_code.upper(),
         "amount": amount,
-        "rate": rate,
+        "rate": total_cost / amount if amount > 0 else 0,
         "old_balance": old_balance,
         "new_balance": new_balance,
         "total_cost": total_cost
     }
 
 
+@log_action("SELL", verbose=True)
 def sell_currency(user: User, currency_code: str, amount: float) -> dict:
-    """Продает валюту: уменьшает баланс кошелька и возвращает данные для отчета."""
-    currency_code = validate_currency(currency_code)
+    get_currency(currency_code)
     if amount <= 0:
         raise ValueError("'amount' должен быть положительным числом")
 
-    portfolios_data = load_data("portfolios.json")
-    user_portfolio: dict | None = None
-    for p in portfolios_data:
-        if p["user_id"] == user.user_id:
-            user_portfolio = p
-            break
+    db = DatabaseManager()
+    portfolios_data = db.load("portfolios.json")
 
+    user_portfolio: dict | None = next((p for p in portfolios_data if p["user_id"] == user.user_id), None)
     if not user_portfolio:
-        raise ValueError("Портфель не найден!")
+        raise ValueError("Портфель не найден.")
 
     if currency_code not in user_portfolio["wallets"]:
-        raise ValueError(f"У вас нет кошелька для валюты {currency_code}")
+        raise InsufficientFundsError(available=0.0, required=amount, code=currency_code)
 
     old_balance = user_portfolio["wallets"][currency_code]["balance"]
-
     if old_balance < amount:
-        raise ValueError(f"Недостаточно средств на счете! Баланс: {old_balance:.4f} {currency_code}")
+        raise InsufficientFundsError(available=old_balance, required=amount, code=currency_code)
+
+    rate_data = get_cross_rate("USD", currency_code)
+    rate = rate_data["rate"]
 
     user_portfolio["wallets"][currency_code]["balance"] -= amount
     new_balance = user_portfolio["wallets"][currency_code]["balance"]
 
-    save_data("portfolios.json", portfolios_data)
+    db.save("portfolios.json", portfolios_data)
 
-    try:
-        rate_info = get_rate(currency_code)
-        rate = rate_info["rate"]
-    except ValueError:
-        raise ValueError(f"Не удалось получить курс для {currency_code}=USD")
-
-    total_cost = amount * rate
+    total_cost = amount / rate  # Оценочная выручка в USD
 
     return {
-        "currency": currency_code,
+        "currency": currency_code.upper(),
         "amount": amount,
-        "rate": rate,
+        "rate": total_cost / amount if amount > 0 else 0,
         "old_balance": old_balance,
         "new_balance": new_balance,
         "total_cost": total_cost
