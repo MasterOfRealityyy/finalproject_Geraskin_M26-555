@@ -2,6 +2,8 @@ import shlex
 import sys
 from prettytable import PrettyTable
 from valutatrade_hub.core import usecases
+from valutatrade_hub.core.exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
+from valutatrade_hub.core.сurrencies import get_all_currency_codes
 
 
 
@@ -100,8 +102,11 @@ def run():
                         table.padding_width = 1
 
                         for w in data["wallets"]:
-                            bal_str = f"- {w['code']}: {w['balance']:.2f}"
-                            val_str = f"-> {w['value']:.2f} {data['base_currency']}"
+                            bal_str = f"- {w['code']}: {w['balance']:.4f}"
+                            if w.get("is_rate_missing"):
+                                val_str = "-> (курс недоступен)"
+                            else:
+                                val_str = f"-> {w['value']:.2f} {data['base_currency']}"
                             table.add_row([bal_str, val_str])
 
                         print(table)
@@ -110,6 +115,8 @@ def run():
 
                     except ValueError as e:
                         print(f"Ошибка: {e}")
+
+
                 case "buy":
                     if current_user is None:
                         print("Сначала выполните login")
@@ -125,7 +132,7 @@ def run():
                         continue
 
                     try:
-                        result = usecases.buy_currency(current_user, currency, amount)
+                        result = usecases.buy_currency(user = current_user, currency_code= currency, amount=amount)
 
                         print(
                             f"Покупка выполнена: {result['amount']:.4f} {result['currency']} по курсу {result['rate']:.2f} USD/{result['currency']}")
@@ -134,6 +141,14 @@ def run():
                             f" - {result['currency']}: было {result['old_balance']:.4f} -> стало {result['new_balance']:.4f}")
                         print(f"Оценочная стоимость покупки: {result['total_cost']:.2f} USD")
 
+
+                    except CurrencyNotFoundError as e:
+                        available = ", ".join(get_all_currency_codes())
+                        print(f"Ошибка: {e}")
+                        print(f"Доступные валюты: {available}")
+                    except ApiRequestError as e:
+                        print(f"Ошибка: {e}")
+                        print("Попробуйте повторить позже или проверьте подключение к сети.")
                     except ValueError as e:
                         print(f"Ошибка: {e}")
 
@@ -152,7 +167,7 @@ def run():
                         continue
 
                     try:
-                        result = usecases.sell_currency(current_user, currency, amount)
+                        result = usecases.sell_currency(user = current_user, currency_code= currency, amount = amount)
 
                         print(
                             f"Продажа выполнена: {result['amount']:.4f} {result['currency']} по курсу {result['rate']:.2f} USD/{result['currency']}")
@@ -161,6 +176,12 @@ def run():
                             f" - {result['currency']}: было {result['old_balance']:.4f} -> стало {result['new_balance']:.4f}")
                         print(f"Оценочная стоимость продажи: {result['total_cost']:.2f} USD")
 
+                    except InsufficientFundsError as e:
+                        print(f"Ошибка: {e}")
+                    except CurrencyNotFoundError as e:
+                        available = ", ".join(get_all_currency_codes())
+                        print(f"Ошибка: {e}")
+                        print(f"Доступные валюты: {available}")
                     except ValueError as e:
                         print(f"Ошибка: {e}")
 
@@ -180,6 +201,14 @@ def run():
                             f"Курс {from_cur.upper()}->{to_cur.upper()}: {result['rate']:.8f} (обновлено: {result['updated_at']})")
                         print(f"Обратный курс {to_cur.upper()}->{from_cur.upper()}: {result['inverse_rate']:.2f}")
 
+
+                    except CurrencyNotFoundError as e:
+                        available = ", ".join(get_all_currency_codes())
+                        print(f"Ошибка: {e}")
+                        print(f"Доступные валюты: {available}")
+                    except ApiRequestError as e:
+                        print(f"Ошибка: {e}")
+                        print("Попробуйте повторить позже или проверьте подключение к сети.")
                     except ValueError as e:
                         print(f"Ошибка: {e}")
 
