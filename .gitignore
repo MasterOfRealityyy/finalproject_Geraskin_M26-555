@@ -17,4 +17,4 @@ htmlcov/
 Thumbs.db
 .env
 .env.*
-data/
+!.env.example
