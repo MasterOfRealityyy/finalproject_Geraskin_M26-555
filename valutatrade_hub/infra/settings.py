@@ -3,7 +3,7 @@ import json
 
 class SettingsLoader:
     """
-    Синглтон для загрузки и кеширования конфигурации проекта.
+    Синглтон для загрузки и кеширования конфигурации.
     """
     _instance = None
 
@@ -24,7 +24,7 @@ class SettingsLoader:
             self._load_config_file()
 
     def _load_config_file(self):
-        """Пытается загрузить настройки из config.json в корне проекта."""
+        """Фуекция для загрузки настройки из config.json в корне проекта."""
         config_path = "config.json"
         if os.path.exists(config_path):
             try:
