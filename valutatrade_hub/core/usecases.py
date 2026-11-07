@@ -7,11 +7,7 @@ from valutatrade_hub.core.utils import load_data
 from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.decorators import log_action
 from valutatrade_hub.core.сurrencies import get_currency
-from valutatrade_hub.core.exceptions import (
-    InsufficientFundsError,
-    CurrencyNotFoundError,
-    ApiRequestError
-)
+from valutatrade_hub.core.exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
 from valutatrade_hub.infra.settings import SettingsLoader
 
 
@@ -111,23 +107,31 @@ def get_rate(currency_code: str) -> dict:
     db = DatabaseManager()
     rates_data = db.load("rates.json", default_factory=dict)
 
-    settings = SettingsLoader()
-    ttl = settings.get("RATES_TTL_SECONDS", 300)
+    pairs = rates_data.get("pairs", {})
 
     if currency_code == "USD":
         return {"rate": 1.0, "updated_at": "now"}
 
     pair = f"{currency_code}_USD"
-    if pair not in rates_data:
+    if pair not in pairs:
         raise CurrencyNotFoundError(currency_code)
 
-    updated_at_str = rates_data[pair].get("updated_at")
-    if updated_at_str:
-        updated_at = datetime.datetime.fromisoformat(updated_at_str)
-        if (datetime.datetime.now() - updated_at).total_seconds() > ttl:
-            raise ApiRequestError(f"Курс для {currency_code} устарел. Обновите данные.")
+    rate_info = pairs[pair]
+    updated_at_str = rate_info.get("updated_at")
 
-    return rates_data[pair]
+    if updated_at_str:
+        try:
+            updated_at = datetime.datetime.fromisoformat(updated_at_str)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            settings = SettingsLoader()
+            ttl = settings.get("RATES_TTL_SECONDS", 300)
+
+            if (now - updated_at).total_seconds() > ttl:
+                raise ApiRequestError(f"Курс для {currency_code} устарел. Выполните 'update-rates'.")
+        except ValueError:
+            raise ApiRequestError(f"Неверный формат времени для {currency_code}.")
+
+    return rate_info
 
 
 def get_cross_rate(from_currency: str, to_currency: str) -> dict:
@@ -159,15 +163,15 @@ def get_cross_rate(from_currency: str, to_currency: str) -> dict:
 
 
 def get_all_rates() -> dict[str, float]:
-    """Возвращает упрощенный словарь курсов: {"USD": 1.0, "EUR": 1.0786, ...}"""
-    rates_data = load_data("rates.json", default_factory=dict)
+    """Возвращает упрощенный словарь курсов: {"USD": 1.0, "EUR": 1.12, ...}"""
+    db = DatabaseManager()
+    rates_data = db.load("rates.json", default_factory=dict)
     rates_dict = {"USD": 1.0}
+    pairs = rates_data.get("pairs", {})
 
-    for pair, info in rates_data.items():
-        if pair in ("source", "last_refresh"):
-            continue
-        currency = pair.split("_")[0]
-        rates_dict[currency] = info["rate"]
+    for pair_key, info in pairs.items():
+        currency_code = pair_key.split("_")[0]
+        rates_dict[currency_code] = info["rate"]
 
     return rates_dict
 
@@ -300,3 +304,41 @@ def sell_currency(user: User, currency_code: str, amount: float) -> dict:
         "new_balance": new_balance,
         "total_cost": total_cost
     }
+
+
+def get_cached_rates(currency: str | None = None, top: int | None = None) -> dict:
+    """Возвращает курсы из кэша с учетом фильтров."""
+    db = DatabaseManager()
+    rates_data = db.load("rates.json", default_factory=dict)
+
+    pairs = rates_data.get("pairs", {})
+    last_refresh = rates_data.get("last_refresh", "unknown")
+
+    if not pairs:
+        raise ValueError("Локальный кеш курсов пуст. Выполните 'update-rates', чтобы загрузить данные.")
+
+    if currency:
+        currency = currency.upper()
+        filtered = {}
+        for pair, info in pairs.items():
+            if pair.startswith(f"{currency}_") or pair.endswith(f"_{currency}"):
+                filtered[pair] = info
+
+        if not filtered:
+            raise ValueError(f"Курс для '{currency}' не найден в кеше.")
+
+        return {"last_refresh": last_refresh, "pairs": filtered}
+
+    if top:
+        sorted_items = sorted(
+            pairs.items(),
+            key=lambda item: item[1]["rate"],
+            reverse=True
+        )
+
+        top_pairs = {k: v for k, v in sorted_items[:top]}
+
+        return {"last_refresh": last_refresh, "pairs": top_pairs}
+
+    sorted_pairs = {k: pairs[k] for k in sorted(pairs.keys())}
+    return {"last_refresh": last_refresh, "pairs": sorted_pairs}
