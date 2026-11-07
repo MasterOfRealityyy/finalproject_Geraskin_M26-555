@@ -4,6 +4,9 @@ from prettytable import PrettyTable
 from valutatrade_hub.core import usecases
 from valutatrade_hub.core.exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
 from valutatrade_hub.core.сurrencies import get_all_currency_codes
+from valutatrade_hub.parser_service.updater import RatesUpdater
+from valutatrade_hub.parser_service.api_clients import CoinGeckoClient, ExchangeRateApiClient
+import valutatrade_hub.parser_service.storage as storage
 
 
 
@@ -212,13 +215,86 @@ def run():
                     except ValueError as e:
                         print(f"Ошибка: {e}")
 
+                case "update-rates":
+                    source_filter = None
+                    if "--source" in args:
+                        try:
+                            src_idx = args.index("--source") + 1
+                            source_filter = args[src_idx].lower()
+                            if source_filter not in ("coingecko", "exchangerate"):
+                                print(
+                                    f"Ошибка: неизвестный источник '{source_filter}'. Используйте 'coingecko' или 'exchangerate'.")
+                                continue
+                        except IndexError:
+                            print("Ошибка: после --source нужно указать 'coingecko' или 'exchangerate'.")
+                            continue
 
-                case "help":
-                    print_help()
+                    try:
+                        clients = [CoinGeckoClient(), ExchangeRateApiClient()]
+                        updater = RatesUpdater(clients=clients, storage_module=storage)
+                        count = updater.run_update(source_filter=source_filter)
+
+                        if count > 0:
+                            print(f"Update successful. Total rates updated: {count}.")
+                        else:
+                            print("Update completed, but no rates were updated. Check logs.")
+
+                    except ApiRequestError as e:
+                        print(f"ERROR: Failed to update rates: {e}")
+                    except Exception as e:
+                        print(f"ERROR: System error during update: {e}")
 
 
+                case "show-rates":
+                    currency_filter = None
+                    top_filter = None
+                    base_currency = "USD"
+
+                    if "--currency" in args:
+                        try:
+                            currency_filter = args[args.index("--currency") + 1]
+                        except IndexError:
+                            print("Ошибка: после --currency нужно указать валюту.")
+                            continue
+
+                    if "--top" in args:
+                        try:
+                            top_filter = int(args[args.index("--top") + 1])
+                        except (IndexError, ValueError):
+                            print("Ошибка: после --top нужно указать целое число.")
+                            continue
+
+                    if "--base" in args:
+                        try:
+                            base_currency = args[args.index("--base") + 1].upper()
+                        except IndexError:
+                            print("Ошибка: после --base нужно указать валюту.")
+                            continue
+
+                    try:
+                        data = usecases.get_cached_rates(currency=currency_filter, top=top_filter)
+
+                        print(f"Rates from cache (updated at {data['last_refresh']}):")
+
+                        all_rates = usecases.get_all_rates()
+                        base_rate = all_rates.get(base_currency)
+
+                        if not base_rate:
+                            print(f"Ошибка: Курс для базовой валюты '{base_currency}' не найден.")
+                            continue
+
+                        for pair, info in data["pairs"].items():
+                            rate_in_usd = info["rate"]
+
+                            final_rate = float(rate_in_usd / base_rate) if base_currency != "USD" else float(rate_in_usd)
+                            print(f"- {pair}: {final_rate:.5f}")
+
+                    except ValueError as e:
+                        print(f"Ошибка: {e}")
                 case _:
                     print(f"Неизвестная команда: {command}")
+
+
 
         except Exception as e:
             print(f"Системная ошибка: {e}")
