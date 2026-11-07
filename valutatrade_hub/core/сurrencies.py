@@ -5,18 +5,17 @@ from valutatrade_hub.core.exceptions import CurrencyNotFoundError
 class Currency(ABC):
     def __init__(self, name: str, code: str):
         if not isinstance(name, str) or not name.strip():
-            raise ValueError("Имя валюты не может быть пустым.")
+            raise ValueError("Имя валюты не может быть пустым!")
 
         code_clean = code.strip().upper()
         if not (2 <= len(code_clean) <= 5):
-            raise ValueError("Код валюты должен содержать от 2 до 5 символов.")
+            raise ValueError("Код валюты должен содержать от 2 до 5 символов!")
 
         self.name = name
         self.code = code_clean
 
     @abstractmethod
     def get_display_info(self) -> str:
-        """Строковое представление для UI/логов."""
         pass
 
 
