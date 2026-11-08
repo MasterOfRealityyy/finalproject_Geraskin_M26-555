@@ -74,7 +74,10 @@ show-rates [--currency <code>] [--top <N>] [--base <code>]	Показать ку
 help	Показать справку
 exit	Выйти из программы
 ```
-Пример работы:
+## Пример работы:
+### Аскинема с примером работы:
+
+[![asciicast](https://asciinema.org/a/v5I5IxiifeoZBE1z.svg)](https://asciinema.org/a/v5I5IxiifeoZBE1z)
 
 ```bash
 Введите команду: register --username alice --password 1234
