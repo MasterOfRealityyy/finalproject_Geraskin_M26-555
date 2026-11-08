@@ -1,13 +1,17 @@
-import secrets
-import hashlib
 import datetime
+import hashlib
+import secrets
 
-from valutatrade_hub.core.models import User, Portfolio
+from valutatrade_hub.core.exceptions import (
+    ApiRequestError,
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
+from valutatrade_hub.core.models import Portfolio, User
 from valutatrade_hub.core.utils import load_data
-from valutatrade_hub.infra.database import DatabaseManager
-from valutatrade_hub.decorators import log_action
 from valutatrade_hub.core.сurrencies import get_currency
-from valutatrade_hub.core.exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
+from valutatrade_hub.decorators import log_action
+from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.infra.settings import SettingsLoader
 
 
@@ -31,7 +35,10 @@ def register_user(username: str, password: str) -> str:
         new_id = 1
 
     salt = secrets.token_hex(16)
-    hashed_password = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+    hashed_password = hashlib.pbkdf2_hmac('sha256',
+                                          password.encode(),
+                                          salt.encode(),
+                                          100000).hex()
 
     new_user = User(
         user_id=new_id,
@@ -62,7 +69,8 @@ def register_user(username: str, password: str) -> str:
     db.save("portfolios.json", portfolios_data)
 
 
-    return f"Пользователь '{username}' зарегистрирован (id={new_id}). Войдите: login --username {username} --password {password}"
+    return (f"Пользователь '{username}' зарегистрирован (id={new_id})."
+            f" Войдите: login --username {username} --password {password}")
 
 @log_action("LOGIN")
 def login(username: str, password: str) -> User:
@@ -127,7 +135,8 @@ def get_rate(currency_code: str) -> dict:
             ttl = settings.get("RATES_TTL_SECONDS", 300)
 
             if (now - updated_at).total_seconds() > ttl:
-                raise ApiRequestError(f"Курс для {currency_code} устарел. Выполните 'update-rates'.")
+                raise ApiRequestError(f"Курс для {currency_code} устарел."
+                                      f" Выполните 'update-rates'.")
         except ValueError:
             raise ApiRequestError(f"Неверный формат времени для {currency_code}.")
 
@@ -146,7 +155,8 @@ def get_cross_rate(from_currency: str, to_currency: str) -> dict:
         from_rate_info = get_rate(from_cur)
         to_rate_info = get_rate(to_cur)
     except ValueError:
-        raise ValueError(f"Курс {from_cur}->{to_cur} недоступен. Повторите попытку позже.")
+        raise ValueError(f"Курс {from_cur}->{to_cur} недоступен. "
+                         f"Повторите попытку позже.")
 
     rate = from_rate_info["rate"] / to_rate_info["rate"]
     inverse_rate = 1 / rate if rate != 0 else 0
@@ -163,7 +173,7 @@ def get_cross_rate(from_currency: str, to_currency: str) -> dict:
 
 
 def get_all_rates() -> dict[str, float]:
-    """Возвращает упрощенный словарь курсов: {"USD": 1.0, "EUR": 1.12, ...}"""
+    """Возвращает упрощенный словарь курсов: {"USD": 1.0, "EUR": 1.12, и т.д}"""
     db = DatabaseManager()
     rates_data = db.load("rates.json", default_factory=dict)
     rates_dict = {"USD": 1.0}
@@ -237,7 +247,8 @@ def buy_currency(user: User, currency_code: str, amount: float) -> dict:
     db = DatabaseManager()
     portfolios_data = db.load("portfolios.json")
 
-    user_portfolio: dict | None= next((p for p in portfolios_data if p["user_id"] == user.user_id), None)
+    user_portfolio: dict | None= next((p for p in portfolios_data
+                                       if p["user_id"] == user.user_id), None)
     if not user_portfolio:
         raise ValueError("Портфель не найден.")
 
@@ -275,16 +286,21 @@ def sell_currency(user: User, currency_code: str, amount: float) -> dict:
     db = DatabaseManager()
     portfolios_data = db.load("portfolios.json")
 
-    user_portfolio: dict | None = next((p for p in portfolios_data if p["user_id"] == user.user_id), None)
+    user_portfolio: dict | None = next((p for p in portfolios_data
+                                        if p["user_id"] == user.user_id), None)
     if not user_portfolio:
         raise ValueError("Портфель не найден.")
 
     if currency_code not in user_portfolio["wallets"]:
-        raise InsufficientFundsError(available=0.0, required=amount, code=currency_code)
+        raise InsufficientFundsError(available=0.0,
+                                     required=amount,
+                                     code=currency_code)
 
     old_balance = user_portfolio["wallets"][currency_code]["balance"]
     if old_balance < amount:
-        raise InsufficientFundsError(available=old_balance, required=amount, code=currency_code)
+        raise InsufficientFundsError(available=old_balance,
+                                     required=amount,
+                                     code=currency_code)
 
     rate_data = get_cross_rate("USD", currency_code)
     rate = rate_data["rate"]
@@ -315,7 +331,8 @@ def get_cached_rates(currency: str | None = None, top: int | None = None) -> dic
     last_refresh = rates_data.get("last_refresh", "unknown")
 
     if not pairs:
-        raise ValueError("Локальный кеш курсов пуст. Выполните 'update-rates', чтобы загрузить данные.")
+        raise ValueError("Локальный кеш курсов пуст. "
+                         "Выполните 'update-rates', чтобы загрузить данные.")
 
     if currency:
         currency = currency.upper()

@@ -3,13 +3,16 @@ import hashlib
 import hmac
 import secrets
 from typing import Optional
+
 from valutatrade_hub.core.exceptions import InsufficientFundsError
 
 
 class User:
     PBKDF2_ITERATIONS = 100000
 
-    def __init__(self, user_id: int, username: str, hashed_password: str, salt: str, registration_date: datetime.datetime):
+    def __init__(self, user_id: int, username: str,
+                 hashed_password: str, salt: str,
+                 registration_date: datetime.datetime):
         self.user_id = user_id
         self.username = username
         self.hashed_password = hashed_password
@@ -66,11 +69,17 @@ class User:
         if len(new_password) < 4:
             raise ValueError("Пароль должен быть не короче 4 символов!")
         self._salt = secrets.token_hex(16)
-        hashed = hashlib.pbkdf2_hmac('sha256', new_password.encode(), self._salt.encode(), self.PBKDF2_ITERATIONS).hex()
+        hashed = hashlib.pbkdf2_hmac('sha256',
+                                     new_password.encode(),
+                                     self._salt.encode(),
+                                     self.PBKDF2_ITERATIONS).hex()
         self.hashed_password = hashed
 
     def verify_password(self, password: str) -> bool:
-        test_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), self._salt.encode(), self.PBKDF2_ITERATIONS).hex()
+        test_hash = hashlib.pbkdf2_hmac('sha256',
+                                        password.encode(),
+                                        self._salt.encode(),
+                                        self.PBKDF2_ITERATIONS).hex()
         return hmac.compare_digest(test_hash, self._hashed_password)
 
 
@@ -150,16 +159,19 @@ class Portfolio:
     def add_currency(self, currency_code: str):
         currency_code = currency_code.upper().strip()
         if currency_code in self._wallets:
-            raise ValueError(f"Кошелек с валютой {currency_code} уже находится в портфеле!")
+            raise ValueError(f"Кошелек с валютой {currency_code}"
+                             f" уже находится в портфеле!")
         self._wallets[currency_code] = Wallet(currency_code)
 
     def get_wallet(self, currency_code: str) -> Wallet:
         currency_code = currency_code.upper().strip()
         if currency_code not in self._wallets:
-            raise ValueError(f'Кошелек с валютой {currency_code} отсутствует в портфеле!')
+            raise ValueError(f'Кошелек с валютой {currency_code}'
+                             f' отсутствует в портфеле!')
         return self._wallets[currency_code]
 
-    def get_total_value(self, base_currency = 'USD', rates: Optional[dict[str, float]] = None) -> float:
+    def get_total_value(self, base_currency = 'USD',
+                        rates: Optional[dict[str, float]] = None) -> float:
         if rates is None:
             rates = {"USD": 1.0, "EUR": 1.08, "BTC": 60000.0}
 

@@ -1,6 +1,7 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+
 from valutatrade_hub.infra.settings import SettingsLoader
 
 
@@ -18,7 +19,10 @@ def setup_logging():
     action_logger.setLevel(log_level)
 
     if not sys_logger.handlers:
-        sys_handler = RotatingFileHandler("logs/app.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
+        sys_handler = RotatingFileHandler("logs/app.log",
+                                          maxBytes=5 * 1024 * 1024,
+                                          backupCount=3,
+                                          encoding="utf-8")
         sys_handler.setFormatter(logging.Formatter(log_format))
         sys_logger.addHandler(sys_handler)
 
@@ -28,7 +32,9 @@ def setup_logging():
 
     if not action_logger.handlers:
         action_format = "%(levelname)s %(message)s"
-        action_handler = RotatingFileHandler("logs/actions.log", maxBytes=5 * 1024 * 1024, backupCount=3,
+        action_handler = RotatingFileHandler("logs/actions.log",
+                                             maxBytes=5 * 1024 * 1024,
+                                             backupCount=3,
                                              encoding="utf-8")
         action_handler.setFormatter(logging.Formatter(action_format))
         action_logger.addHandler(action_handler)

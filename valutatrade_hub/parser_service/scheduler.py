@@ -1,10 +1,14 @@
-import time
 import logging
-from valutatrade_hub.parser_service.updater import RatesUpdater
-from valutatrade_hub.parser_service.api_clients import CoinGeckoClient, ExchangeRateApiClient
+import time
+
 import valutatrade_hub.parser_service.storage as storage
-from valutatrade_hub.logging_config import setup_logging
 from valutatrade_hub.infra.settings import SettingsLoader
+from valutatrade_hub.logging_config import setup_logging
+from valutatrade_hub.parser_service.api_clients import (
+    CoinGeckoClient,
+    ExchangeRateApiClient,
+)
+from valutatrade_hub.parser_service.updater import RatesUpdater
 
 logger = logging.getLogger("valutatrade")
 

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from valutatrade_hub.core.exceptions import CurrencyNotFoundError
 
 
@@ -36,7 +37,8 @@ class CryptoCurrency(Currency):
 
     def get_display_info(self) -> str:
         mcap_str = f"{self.market_cap:.2e}".replace("e+", "e")
-        return f"[CRYPTO] {self.code} — {self.name} (Algo: {self.algorithm}, MCAP: {mcap_str})"
+        return (f"[CRYPTO] {self.code} — {self.name} "
+                f"(Algo: {self.algorithm}, MCAP: {mcap_str})")
 
 
 _CURRENCIES = {

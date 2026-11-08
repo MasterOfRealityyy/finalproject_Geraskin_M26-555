@@ -1,9 +1,11 @@
+import logging
 import time
-import requests
 from abc import ABC, abstractmethod
+
+import requests
+
 from valutatrade_hub.core.exceptions import ApiRequestError
 from valutatrade_hub.parser_service.config import parser_config
-import logging
 
 logger = logging.getLogger("valutatrade")
 
@@ -73,15 +75,20 @@ class ExchangeRateApiClient(BaseApiClient):
     def fetch_rates(self) -> list[dict]:
 
         if not parser_config.EXCHANGERATE_API_KEY:
-            logger.warning("Ключ ExchangeRate-API не найден. Используются тестовые данные.")
+            logger.warning("Ключ ExchangeRate-API не найден."
+                           " Используются тестовые данные.")
             return [
-                {"pair": "EUR_USD", "rate": 0.92, "meta": {"raw_id": "USD", "request_ms": 0, "status_code": 200}},
-                {"pair": "GBP_USD", "rate": 0.79, "meta": {"raw_id": "USD", "request_ms": 0, "status_code": 200}},
-                {"pair": "RUB_USD", "rate": 90.0, "meta": {"raw_id": "USD", "request_ms": 0, "status_code": 200}},
+                {"pair": "EUR_USD", "rate": 0.92,
+                 "meta": {"raw_id": "USD", "request_ms": 0, "status_code": 200}},
+                {"pair": "GBP_USD", "rate": 0.79,
+                 "meta": {"raw_id": "USD", "request_ms": 0, "status_code": 200}},
+                {"pair": "RUB_USD", "rate": 90.0,
+                 "meta": {"raw_id": "USD", "request_ms": 0, "status_code": 200}},
             ]
 
         base_cur = parser_config.BASE_FIAT_CURRENCY.upper()
-        url = f"{parser_config.EXCHANGERATE_API_URL}/{parser_config.EXCHANGERATE_API_KEY}/latest/{base_cur}"
+        url = (f"{parser_config.EXCHANGERATE_API_URL}/"
+               f"{parser_config.EXCHANGERATE_API_KEY}/latest/{base_cur}")
 
         start_time = time.perf_counter()
         try:

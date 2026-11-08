@@ -1,13 +1,21 @@
 import shlex
 import sys
-from prettytable import PrettyTable
-from valutatrade_hub.core import usecases
-from valutatrade_hub.core.exceptions import InsufficientFundsError, CurrencyNotFoundError, ApiRequestError
-from valutatrade_hub.core.сurrencies import get_all_currency_codes
-from valutatrade_hub.parser_service.updater import RatesUpdater
-from valutatrade_hub.parser_service.api_clients import CoinGeckoClient, ExchangeRateApiClient
-import valutatrade_hub.parser_service.storage as storage
 
+from prettytable import PrettyTable
+
+import valutatrade_hub.parser_service.storage as storage
+from valutatrade_hub.core import usecases
+from valutatrade_hub.core.exceptions import (
+    ApiRequestError,
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
+from valutatrade_hub.core.сurrencies import get_all_currency_codes
+from valutatrade_hub.parser_service.api_clients import (
+    CoinGeckoClient,
+    ExchangeRateApiClient,
+)
+from valutatrade_hub.parser_service.updater import RatesUpdater
 
 
 def print_help():
@@ -51,7 +59,9 @@ def run():
                         username = args[username_index]
                         password = args[password_index]
                     except ValueError:
-                        print("Ошибка: неверный формат. Используйте: register --username <name> --password <pass>")
+                        print("Ошибка: неверный формат. "
+                              "Используйте: "
+                              "register --username <name> --password <pass>")
                         continue
                     try:
                         result_message = usecases.register_user(username, password)
@@ -67,7 +77,8 @@ def run():
                         username = args[username_index]
                         password = args[password_index]
                     except ValueError:
-                        print("Ошибка: используйте 'login --username <name> --password <pass>'")
+                        print("Ошибка: используйте "
+                              "'login --username <name> --password <pass>'")
                         continue
                     try:
                         current_user = usecases.login(username, password)
@@ -96,7 +107,8 @@ def run():
                             print("У вас пока нет кошельков.")
                             continue
 
-                        print(f"Портфель пользователя '{data['username']}' (база: {data['base_currency']}):")
+                        print(f"Портфель пользователя '{data['username']}'"
+                              f" (база: {data['base_currency']}):")
 
                         table = PrettyTable()
                         table.border = False
@@ -131,18 +143,25 @@ def run():
                         currency = args[curr_idx]
                         amount = float(args[amt_idx])
                     except (ValueError, IndexError):
-                        print("Ошибка: используйте 'buy --currency <code> --amount <number>'")
+                        print("Ошибка: используйте "
+                              "'buy --currency <code> --amount <number>'")
                         continue
 
                     try:
-                        result = usecases.buy_currency(user = current_user, currency_code= currency, amount=amount)
+                        result = usecases.buy_currency(user = current_user,
+                                                       currency_code= currency,
+                                                       amount=amount)
 
                         print(
-                            f"Покупка выполнена: {result['amount']:.4f} {result['currency']} по курсу {result['rate']:.2f} USD/{result['currency']}")
+                            f"Покупка выполнена: {result['amount']:.4f}"
+                            f" {result['currency']}"
+                            f" по курсу {result['rate']:.2f} USD/{result['currency']}")
                         print("Изменения в портфеле:")
                         print(
-                            f" - {result['currency']}: было {result['old_balance']:.4f} -> стало {result['new_balance']:.4f}")
-                        print(f"Оценочная стоимость покупки: {result['total_cost']:.2f} USD")
+                            f" - {result['currency']}: было {result['old_balance']:.4f}"
+                            f" -> стало {result['new_balance']:.4f}")
+                        print(f"Оценочная стоимость покупки:"
+                              f" {result['total_cost']:.2f} USD")
 
 
                     except CurrencyNotFoundError as e:
@@ -151,7 +170,8 @@ def run():
                         print(f"Доступные валюты: {available}")
                     except ApiRequestError as e:
                         print(f"Ошибка: {e}")
-                        print("Попробуйте повторить позже или проверьте подключение к сети.")
+                        print("Попробуйте повторить позже "
+                              "или проверьте подключение к сети.")
                     except ValueError as e:
                         print(f"Ошибка: {e}")
 
@@ -166,18 +186,25 @@ def run():
                         currency = args[curr_idx]
                         amount = float(args[amt_idx])
                     except (ValueError, IndexError):
-                        print("Ошибка: используйте 'sell --currency <code> --amount <number>'")
+                        print("Ошибка: используйте "
+                              "'sell --currency <code> --amount <number>'")
                         continue
 
                     try:
-                        result = usecases.sell_currency(user = current_user, currency_code= currency, amount = amount)
+                        result = usecases.sell_currency(user = current_user,
+                                                        currency_code= currency,
+                                                        amount = amount)
 
                         print(
-                            f"Продажа выполнена: {result['amount']:.4f} {result['currency']} по курсу {result['rate']:.2f} USD/{result['currency']}")
+                            f"Продажа выполнена: {result['amount']:.4f} "
+                            f"{result['currency']} по курсу"
+                            f" {result['rate']:.2f} USD/{result['currency']}")
                         print("Изменения в портфеле:")
                         print(
-                            f" - {result['currency']}: было {result['old_balance']:.4f} -> стало {result['new_balance']:.4f}")
-                        print(f"Оценочная стоимость продажи: {result['total_cost']:.2f} USD")
+                            f" - {result['currency']}: было {result['old_balance']:.4f}"
+                            f" -> стало {result['new_balance']:.4f}")
+                        print(f"Оценочная стоимость продажи:"
+                              f" {result['total_cost']:.2f} USD")
 
                     except InsufficientFundsError as e:
                         print(f"Ошибка: {e}")
@@ -195,14 +222,18 @@ def run():
                         from_cur = args[from_idx]
                         to_cur = args[to_idx]
                     except (ValueError, IndexError):
-                        print("Ошибка: используйте 'get-rate --from <code> --to <code>'")
+                        print("Ошибка: используйте"
+                              " 'get-rate --from <code> --to <code>'")
                         continue
 
                     try:
                         result = usecases.get_cross_rate(from_cur, to_cur)
                         print(
-                            f"Курс {from_cur.upper()}->{to_cur.upper()}: {result['rate']:.8f} (обновлено: {result['updated_at']})")
-                        print(f"Обратный курс {to_cur.upper()}->{from_cur.upper()}: {result['inverse_rate']:.2f}")
+                            f"Курс {from_cur.upper()}->{to_cur.upper()}:"
+                            f" {result['rate']:.8f}"
+                            f" (обновлено: {result['updated_at']})")
+                        print(f"Обратный курс {to_cur.upper()}->{from_cur.upper()}:"
+                              f" {result['inverse_rate']:.2f}")
 
 
                     except CurrencyNotFoundError as e:
@@ -211,7 +242,8 @@ def run():
                         print(f"Доступные валюты: {available}")
                     except ApiRequestError as e:
                         print(f"Ошибка: {e}")
-                        print("Попробуйте повторить позже или проверьте подключение к сети.")
+                        print("Попробуйте повторить позже "
+                              "или проверьте подключение к сети.")
                     except ValueError as e:
                         print(f"Ошибка: {e}")
 
@@ -223,10 +255,12 @@ def run():
                             source_filter = args[src_idx].lower()
                             if source_filter not in ("coingecko", "exchangerate"):
                                 print(
-                                    f"Ошибка: неизвестный источник '{source_filter}'. Используйте 'coingecko' или 'exchangerate'.")
+                                    f"Ошибка: неизвестный источник '{source_filter}'."
+                                    f" Используйте 'coingecko' или 'exchangerate'.")
                                 continue
                         except IndexError:
-                            print("Ошибка: после --source нужно указать 'coingecko' или 'exchangerate'.")
+                            print("Ошибка: после --source "
+                                  "нужно указать 'coingecko' или 'exchangerate'.")
                             continue
 
                     try:
@@ -237,7 +271,8 @@ def run():
                         if count > 0:
                             print(f"Update successful. Total rates updated: {count}.")
                         else:
-                            print("Update completed, but no rates were updated. Check logs.")
+                            print("Update completed, but no rates were updated."
+                                  " Check logs.")
 
                     except ApiRequestError as e:
                         print(f"ERROR: Failed to update rates: {e}")
@@ -272,7 +307,8 @@ def run():
                             continue
 
                     try:
-                        data = usecases.get_cached_rates(currency=currency_filter, top=top_filter)
+                        data = usecases.get_cached_rates(currency=currency_filter,
+                                                         top=top_filter)
 
                         print(f"Rates from cache (updated at {data['last_refresh']}):")
 
@@ -280,13 +316,15 @@ def run():
                         base_rate = all_rates.get(base_currency)
 
                         if not base_rate:
-                            print(f"Ошибка: Курс для базовой валюты '{base_currency}' не найден.")
+                            print(f"Ошибка: Курс для базовой валюты '{base_currency}'"
+                                  f" не найден.")
                             continue
 
                         for pair, info in data["pairs"].items():
                             rate_in_usd = info["rate"]
 
-                            final_rate = float(rate_in_usd / base_rate) if base_currency != "USD" else float(rate_in_usd)
+                            final_rate = float(rate_in_usd / base_rate) \
+                                if base_currency != "USD" else float(rate_in_usd)
                             print(f"- {pair}: {final_rate:.5f}")
 
                     except ValueError as e:

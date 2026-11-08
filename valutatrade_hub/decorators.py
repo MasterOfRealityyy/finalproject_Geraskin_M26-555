@@ -1,5 +1,5 @@
-import logging
 import functools
+import logging
 
 logger = logging.getLogger("valutatrade_actions")
 
@@ -28,7 +28,8 @@ def log_action(action: str, verbose: bool = False):
 
             if currency is None:
                 for arg in args:
-                    if isinstance(arg, str) and arg.upper() in ["USD", "EUR", "BTC", "ETH", "RUB"]:
+                    if (isinstance(arg, str) and arg.upper() in
+                            ["USD", "EUR", "BTC", "ETH", "RUB"]):
                         currency = arg
                         break
             if amount is None:
@@ -50,10 +51,12 @@ def log_action(action: str, verbose: bool = False):
                         log_data["rate"] = f"{result['rate']:.2f}"
                         log_data["base"] = "'USD'"
                     if verbose and "old_balance" in result and "new_balance" in result:
-                        log_data["wallet_state"] = f"{result['old_balance']:.4f}->{result['new_balance']:.4f}"
+                        log_data["wallet_state"] = (f"{result['old_balance']:.4f}->"
+                                                    f"{result['new_balance']:.4f}")
 
                 log_data["result"] = "OK"
-                log_msg = f"{action} " + " ".join(f"{k}={v}" for k, v in log_data.items())
+                log_msg = f"{action} " + " ".join(f"{k}={v}"
+                                                  for k, v in log_data.items())
                 logger.info(log_msg)
 
                 return result
@@ -62,7 +65,8 @@ def log_action(action: str, verbose: bool = False):
                 log_data["result"] = "ERROR"
                 log_data["error_type"] = type(e).__name__
                 log_data["error_message"] = f"'{str(e)}'"
-                log_msg = f"{action} " + " ".join(f"{k}={v}" for k, v in log_data.items())
+                log_msg = f"{action} " + " ".join(f"{k}={v}"
+                                                  for k, v in log_data.items())
                 logger.error(log_msg)
 
                 raise e

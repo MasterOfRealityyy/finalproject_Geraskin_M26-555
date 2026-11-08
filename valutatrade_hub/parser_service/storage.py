@@ -1,7 +1,8 @@
 import datetime
 from typing import Optional
-from valutatrade_hub.parser_service.config import parser_config
+
 from valutatrade_hub.infra.database import DatabaseManager
+from valutatrade_hub.parser_service.config import parser_config
 
 
 def _get_utc_now_iso() -> str:

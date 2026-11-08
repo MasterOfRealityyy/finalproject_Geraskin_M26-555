@@ -6,7 +6,8 @@ class ValutaTradeError(Exception):
 class InsufficientFundsError(ValutaTradeError):
     """Недостаточно средств для совершения операции."""
     def __init__(self, available: float, required: float, code: str):
-        self.message = f"Недостаточно средств: доступно {available:.4f} {code}, требуется {required:.4f} {code}"
+        self.message = (f"Недостаточно средств: доступно {available:.4f} {code},"
+                        f" требуется {required:.4f} {code}")
         super().__init__(self.message)
 
 

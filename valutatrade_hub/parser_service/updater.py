@@ -1,4 +1,5 @@
 import logging
+
 from valutatrade_hub.core.exceptions import ApiRequestError
 
 logger = logging.getLogger("valutatrade")
@@ -27,7 +28,8 @@ class RatesUpdater:
                 if "coingecko" in source_filter and "CoinGecko" not in client_name:
                     logger.info(f"Пропуск {client_name} (фильтр: {source_filter})")
                     continue
-                if "exchangerate" in source_filter and "ExchangeRate" not in client_name:
+                if ("exchangerate" in source_filter
+                        and "ExchangeRate" not in client_name):
                     logger.info(f"Пропуск {client_name} (фильтр: {source_filter})")
                     continue
 
@@ -41,7 +43,8 @@ class RatesUpdater:
                     pair = item["pair"]
                     rate = item["rate"]
                     meta = item["meta"]
-                    source = "CoinGecko" if "CoinGecko" in client_name else "ExchangeRate-API"
+                    source = "CoinGecko" if (
+                            "CoinGecko" in client_name) else "ExchangeRate-API"
 
                     from_cur, to_cur = pair.split("_")
                     self.storage.save_to_history(
@@ -68,9 +71,11 @@ class RatesUpdater:
 
         if all_rates_for_cache:
             self.storage.update_cache(all_rates_for_cache)
-            logger.info(f"Кэш успешно обновлен. Обработано пар: {len(all_rates_for_cache)}.")
+            logger.info(f"Кэш успешно обновлен."
+                        f" Обработано пар: {len(all_rates_for_cache)}.")
         else:
-            logger.warning("Не удалось получить данные ни от одного клиента. Кэш не обновлен.")
+            logger.warning("Не удалось получить данные ни от одного клиента."
+                           " Кэш не обновлен.")
 
         logger.info("Обновление курсов завершено.")
         return len(all_rates_for_cache)
