@@ -11,6 +11,7 @@ from valutatrade_hub.core.exceptions import (
     InsufficientFundsError,
 )
 from valutatrade_hub.core.сurrencies import get_all_currency_codes
+from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.parser_service.api_clients import (
     CoinGeckoClient,
     ExchangeRateApiClient,
@@ -19,23 +20,43 @@ from valutatrade_hub.parser_service.updater import RatesUpdater
 
 
 def print_help():
-    """Выводит список доступных команд"""
+    """Выводит список доступных команд."""
     print("\nДоступные команды:")
-    print("  register <username> <password> - Зарегистрировать нового пользователя")
-    print("  login <username> <password>    - Войти в систему")
-    print("  show-portfolio                 - Показать портфель и балансы")
-    print("  buy <currency> <amount>        - Купить валюту")
-    print("  sell <currency> <amount>       - Продать валюту")
-    print("  get-rate <currency>            - Получить текущий курс валюты")
-    print("  help                           - Показать это сообщение")
-    print("  exit                           - Выйти из программы")
+    print("  register --username <name> --password <pass>"
+          "  - Регистрация нового пользователя")
+    print("  login --username <name> --password <pass>"
+          "     - Вход в систему")
+    print("  show-portfolio [--base <currency>]"
+          "            - Показать портфель (по умолчанию в USD)")
+    print("  buy --currency <code> --amount <number>"
+          "       - Купить валюту")
+    print("  sell --currency <code> --amount <number>"
+          "      - Продать валюту")
+    print("  get-rate --from <code> --to <code>"
+          "            - Узнать курс между двумя валютами")
+    print()
+    print("  update-rates"
+          " [--source <coingecko|exchangerate>] - Обновить курсы (Парсер)")
+    print("  show-rates [--currency <code>]"
+          " [--top <N>] [--base <code>] - Показать курсы из кэша")
+    print()
+    print("  help - Показать справку по доступным командам")
+    print("  exit - Выйти из программы")
     print()
 
 
 def run():
     print("Вас приветствует ValutaTrade Hub!")
+    print("ВНИМАНИЕ! Обязательно выполните команду 'update-rates'"
+          " во время первого запуска программы!")
     print("Введите 'help' для списка команд!")
     current_user = None
+
+    db = DatabaseManager()
+    rates_data = db.load("rates.json", default_factory=dict)
+
+    if not rates_data.get("pairs"):
+        print("Локальный кэш курсов пуст. Выполните 'update-rates'.")
 
     while True:
         try:
@@ -50,6 +71,10 @@ def run():
                 case "exit":
                     print("Выход из программы")
                     sys.exit(0)
+
+
+                case "help":
+                    print_help()
 
 
                 case "register":
